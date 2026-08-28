@@ -3,135 +3,418 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI Trading Platform</title>
-<meta http-equiv="refresh" content="30">
+<title>THE FORGE</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
-  :root { color-scheme: dark; }
-  body { background: #0b0e14; color: #e6e6e6; font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 24px; }
-  h1 { font-size: 20px; margin: 0 0 4px; }
-  .subtitle { color: #8b93a7; font-size: 13px; margin-bottom: 24px; }
-  .cards { display: flex; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; }
-  .card { background: #131826; border: 1px solid #1f2636; border-radius: 10px; padding: 16px 20px; min-width: 160px; }
-  .card .label { color: #8b93a7; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
-  .card .value { font-size: 22px; font-weight: 600; margin-top: 4px; }
-  .pos { color: #3ecf8e; }
-  .neg { color: #f2545b; }
-  section { margin-bottom: 32px; }
-  section h2 { font-size: 15px; color: #c7cdda; border-bottom: 1px solid #1f2636; padding-bottom: 8px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { text-align: left; color: #8b93a7; font-weight: 500; padding: 6px 10px; border-bottom: 1px solid #1f2636; }
-  td { padding: 6px 10px; border-bottom: 1px solid #161b28; vertical-align: top; }
-  tr:hover td { background: #10141f; }
-  .side-buy { color: #3ecf8e; }
-  .side-sell { color: #f2545b; }
-  .approved { color: #3ecf8e; }
-  .rejected { color: #f2545b; }
-  .pending { color: #8b93a7; }
-  .reason { color: #8b93a7; max-width: 420px; }
-  .mono { font-variant-numeric: tabular-nums; }
-  .empty { color: #565f75; font-style: italic; padding: 12px; }
+  :root {
+    --bg: #0a0b0d;
+    --panel: #111318;
+    --panel-alt: #15171d;
+    --border: #22252c;
+    --border-soft: #1a1c22;
+    --text: #e7e8ec;
+    --text-dim: #8a8f9c;
+    --text-faint: #565a66;
+    --green: #26d07c;
+    --red: #f0454f;
+    --amber: #e0a83e;
+    --blue: #5b8cff;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
+  body { font-size: 13px; }
+  a { color: inherit; }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .up { color: var(--green); }
+  .down { color: var(--red); }
+  .dim { color: var(--text-dim); }
+  .faint { color: var(--text-faint); }
+
+  /* ---------- header ---------- */
+  header.bar {
+    display: flex; align-items: center; gap: 20px;
+    height: 52px; padding: 0 16px;
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 20;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: .06em; font-size: 14px; }
+  .brand .mark { width: 8px; height: 8px; background: var(--amber); border-radius: 1px; box-shadow: 0 0 8px var(--amber); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 3px; font-size: 11px; letter-spacing: .04em; color: var(--text-dim); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-faint); }
+  .dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+  .dot.off { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  header .spacer { flex: 1; }
+  .hstat { text-align: right; }
+  .hstat .label { font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .06em; }
+  .hstat .value { font-family: var(--mono); font-size: 14px; font-weight: 600; }
+  .mode-badge { font-family: var(--mono); font-weight: 700; font-size: 11px; letter-spacing: .08em; padding: 4px 10px; border-radius: 3px; border: 1px solid; }
+  .mode-badge.paper { color: var(--blue); border-color: var(--blue); background: rgba(91,140,255,.08); }
+  .kill-btn { font-family: var(--mono); font-weight: 700; font-size: 11px; letter-spacing: .06em; padding: 6px 12px; border-radius: 3px; border: 1px solid var(--red); color: var(--red); background: rgba(240,69,79,.06); cursor: pointer; }
+  .kill-btn:hover { background: rgba(240,69,79,.15); }
+  .kill-btn.engaged { background: var(--red); color: #0a0b0d; }
+
+  /* ---------- layout ---------- */
+  .terminal {
+    display: grid;
+    grid-template-columns: 68px 1fr 340px;
+    grid-template-areas:
+      "sidebar watchlist ai"
+      "sidebar chart ai"
+      "sidebar chart risk"
+      "sidebar activity activity";
+    gap: 10px; padding: 10px;
+    min-height: calc(100vh - 52px);
+  }
+  @media (max-width: 980px) {
+    .terminal { grid-template-columns: 1fr; grid-template-areas: "watchlist" "chart" "ai" "risk" "activity"; }
+    aside.sidebar { display: none; }
+  }
+
+  aside.sidebar { grid-area: sidebar; display: flex; flex-direction: column; gap: 4px; }
+  .navitem { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; border-radius: 4px; font-size: 9px; letter-spacing: .04em; color: var(--text-faint); border: 1px solid transparent; }
+  .navitem.active { color: var(--text); background: var(--panel); border-color: var(--border); }
+  .navitem .glyph { font-size: 15px; }
+
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; }
+  .panel > .ptitle { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; border-bottom: 1px solid var(--border-soft); font-size: 10.5px; font-weight: 700; letter-spacing: .08em; color: var(--text-dim); text-transform: uppercase; }
+  .panel > .pbody { padding: 10px 12px; overflow: auto; }
+
+  #watchlist-panel { grid-area: watchlist; }
+  #chart-panel { grid-area: chart; min-height: 420px; }
+  #ai-panel { grid-area: ai; }
+  #risk-panel { grid-area: risk; }
+  #activity-panel { grid-area: activity; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .05em; font-weight: 500; padding: 5px 8px; border-bottom: 1px solid var(--border-soft); }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--border-soft); }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover td { background: var(--panel-alt); }
+  tr.active-row td { background: rgba(91,140,255,.06); }
+
+  .badge { display: inline-block; padding: 2px 7px; border-radius: 3px; font-size: 10px; font-weight: 700; letter-spacing: .04em; }
+  .badge.buy, .badge.long, .badge.bullish { color: var(--green); background: rgba(38,208,124,.1); }
+  .badge.sell, .badge.short, .badge.bearish { color: var(--red); background: rgba(240,69,79,.1); }
+  .badge.neutral, .badge.wait { color: var(--amber); background: rgba(224,168,62,.1); }
+  .badge.none { color: var(--text-faint); background: transparent; border: 1px solid var(--border); }
+
+  #chart-toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border-soft); }
+  #chart-symbol { font-weight: 700; font-size: 13px; letter-spacing: .02em; }
+  #chart-price { font-family: var(--mono); font-size: 13px; }
+  .tf-btn { font-family: var(--mono); font-size: 11px; padding: 4px 9px; border-radius: 3px; border: 1px solid var(--border); background: transparent; color: var(--text-dim); cursor: pointer; }
+  .tf-btn.active { color: var(--text); border-color: var(--blue); background: rgba(91,140,255,.08); }
+  #chart-container { flex: 1; min-height: 340px; }
+  #chart-status { font-size: 11px; color: var(--text-faint); padding: 4px 12px; }
+
+  .kv-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--border-soft); font-size: 12px; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-row .k { color: var(--text-dim); }
+  .kv-row .v { font-family: var(--mono); font-weight: 600; }
+
+  .ai-card { border: 1px solid var(--border-soft); border-radius: 5px; padding: 10px; margin-bottom: 8px; }
+  .ai-card .row1 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .ai-card .sym { font-weight: 700; font-size: 12.5px; }
+  .ai-card .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin: 8px 0; font-family: var(--mono); font-size: 11px; }
+  .ai-card .grid div span { display: block; color: var(--text-faint); font-family: var(--sans); font-size: 9px; text-transform: uppercase; margin-bottom: 2px; }
+  .ai-card .reasoning { font-size: 11.5px; color: var(--text-dim); line-height: 1.5; }
+  .ai-card .risk-note { margin-top: 6px; font-size: 11px; color: var(--amber); }
+
+  .feed-item { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border-soft); font-size: 11.5px; }
+  .feed-item .t { font-family: var(--mono); color: var(--text-faint); white-space: nowrap; }
+  .feed-item .msg { color: var(--text-dim); }
+  .feed-item .msg b { color: var(--text); }
+
+  .empty { color: var(--text-faint); font-style: italic; padding: 16px 4px; text-align: center; font-size: 12px; }
+
+  #activity-panel .pbody { max-height: 480px; }
 </style>
 </head>
 <body>
-  <h1>AI Trading Platform</h1>
-  <div class="subtitle">Paper trading &middot; refreshes every 30s</div>
 
-  <div class="cards">
-    <div class="card">
-      <div class="label">Portfolio value</div>
-      <div class="value">${{ "%.2f"|format(state.portfolio_value) }}</div>
+<header class="bar">
+  <div class="brand"><span class="mark"></span> THE FORGE</div>
+  <span class="pill"><span class="dot on"></span> MARKET OPEN</span>
+  <span class="pill" id="bot-pill"><span class="dot" id="bot-dot"></span> <span id="bot-text">—</span></span>
+  <div class="spacer"></div>
+  <div class="hstat"><div class="label">Portfolio</div><div class="value mono" id="h-balance">—</div></div>
+  <div class="hstat"><div class="label">Today P&amp;L</div><div class="value mono" id="h-pnl">—</div></div>
+  <span class="mode-badge paper" id="h-mode">PAPER</span>
+  <button class="kill-btn" id="kill-btn">KILL TRADING</button>
+</header>
+
+<div class="terminal">
+  <aside class="sidebar">
+    <div class="navitem active"><span class="glyph">&#9635;</span>TERMINAL</div>
+    <div class="navitem"><span class="glyph">&#128202;</span>PERF</div>
+    <div class="navitem"><span class="glyph">&#9881;</span>BACKTEST</div>
+    <div class="navitem"><span class="glyph">&#128274;</span>RISK</div>
+    <div class="navitem"><span class="glyph">&#9776;</span>SETTINGS</div>
+  </aside>
+
+  <section class="panel" id="watchlist-panel">
+    <div class="ptitle">Watchlist</div>
+    <div class="pbody" style="padding:0"><table><thead><tr>
+      <th>Symbol</th><th>Price</th><th>24h</th><th>Volume</th><th>Signal</th>
+    </tr></thead><tbody id="watchlist-body"></tbody></table></div>
+  </section>
+
+  <section class="panel" id="chart-panel">
+    <div id="chart-toolbar">
+      <span id="chart-symbol">—</span>
+      <span id="chart-price" class="mono"></span>
+      <div class="spacer" style="flex:1"></div>
+      <button class="tf-btn" data-tf="15m">15m</button>
+      <button class="tf-btn active" data-tf="1h">1h</button>
+      <button class="tf-btn" data-tf="4h">4h</button>
+      <button class="tf-btn" data-tf="1d">1D</button>
     </div>
-    <div class="card">
-      <div class="label">Cash (USDT)</div>
-      <div class="value">${{ "%.2f"|format(state.cash_usdt) }}</div>
-    </div>
-    <div class="card">
-      <div class="label">Realized P&amp;L (last 30 trades)</div>
-      <div class="value {{ 'pos' if state.realized_pnl_recent >= 0 else 'neg' }}">
-        {{ "%+.2f"|format(state.realized_pnl_recent) }}
-      </div>
-    </div>
-  </div>
-
-  <section>
-    <h2>Balances</h2>
-    <table>
-      <tr><th>Asset</th><th>Amount</th></tr>
-      {% for b in state.balances %}
-      <tr><td>{{ b.asset }}</td><td class="mono">{{ "%.8g"|format(b.amount) }}</td></tr>
-      {% endfor %}
-    </table>
+    <div id="chart-container"></div>
+    <div id="chart-status"></div>
   </section>
 
-  <section>
-    <h2>Open Positions</h2>
-    {% if state.positions %}
-    <table>
-      <tr><th>Asset</th><th>Amount</th><th>Avg Entry</th><th>Live Price</th><th>Market Value</th><th>Unrealized P&amp;L</th></tr>
-      {% for p in state.positions %}
-      <tr>
-        <td>{{ p.asset }}</td>
-        <td class="mono">{{ "%.8g"|format(p.amount) }}</td>
-        <td class="mono">${{ "%.4f"|format(p.avg_entry_price) }}</td>
-        <td class="mono">{{ "$%.4f"|format(p.live_price) if p.live_price else "—" }}</td>
-        <td class="mono">{{ "$%.2f"|format(p.market_value) if p.market_value else "—" }}</td>
-        <td class="mono {{ 'pos' if p.unrealized_pnl and p.unrealized_pnl >= 0 else 'neg' }}">
-          {{ "%+.2f"|format(p.unrealized_pnl) if p.unrealized_pnl is not none else "—" }}
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
-    {% else %}
-    <div class="empty">No open positions.</div>
-    {% endif %}
+  <section class="panel" id="ai-panel">
+    <div class="ptitle">AI Analyst</div>
+    <div class="pbody" id="ai-body"><div class="empty">No signals reviewed yet.</div></div>
   </section>
 
-  <section>
-    <h2>Recent Trades</h2>
-    {% if state.trades %}
-    <table>
-      <tr><th>Time (UTC)</th><th>Strategy</th><th>Symbol</th><th>Side</th><th>Price</th><th>Amount</th><th>Fee</th><th>Realized P&amp;L</th></tr>
-      {% for t in state.trades %}
-      <tr>
-        <td>{{ t.timestamp[:19] }}</td>
-        <td>{{ t.strategy }}</td>
-        <td>{{ t.symbol }}</td>
-        <td class="side-{{ t.side }}">{{ t.side }}</td>
-        <td class="mono">{{ "%.6g"|format(t.price) }}</td>
-        <td class="mono">{{ "%.6g"|format(t.amount) }}</td>
-        <td class="mono">{{ "%.4f"|format(t.fee) }}</td>
-        <td class="mono {{ 'pos' if t.realized_pnl >= 0 else 'neg' }}">{{ "%+.2f"|format(t.realized_pnl) }}</td>
-      </tr>
-      {% endfor %}
-    </table>
-    {% else %}
-    <div class="empty">No trades yet.</div>
-    {% endif %}
+  <section class="panel" id="risk-panel">
+    <div class="ptitle">Risk Engine</div>
+    <div class="pbody" id="risk-body"></div>
   </section>
 
-  <section>
-    <h2>Recent Signals &amp; AI Decisions</h2>
-    {% if state.signals %}
-    <table>
-      <tr><th>Time (UTC)</th><th>Strategy</th><th>Symbol</th><th>Side</th><th>Reason</th><th>AI</th><th>AI Reasoning</th><th>Executed</th></tr>
-      {% for s in state.signals %}
-      <tr>
-        <td>{{ s.timestamp[:19] }}</td>
-        <td>{{ s.strategy }}</td>
-        <td>{{ s.symbol }}</td>
-        <td class="side-{{ s.side }}">{{ s.side }}</td>
-        <td class="reason">{{ s.details }}</td>
-        <td class="{{ 'approved' if s.ai_approved else ('rejected' if s.ai_approved == false else 'pending') }}">
-          {{ "approved" if s.ai_approved else ("rejected" if s.ai_approved == false else "pending") }}
-        </td>
-        <td class="reason">{{ s.ai_reasoning }}</td>
-        <td>{{ "yes" if s.executed else "no" }}</td>
-      </tr>
-      {% endfor %}
-    </table>
-    {% else %}
-    <div class="empty">No signals yet.</div>
-    {% endif %}
+  <section class="panel" id="activity-panel">
+    <div class="ptitle">System Activity</div>
+    <div class="pbody" id="activity-body"><div class="empty">No activity yet.</div></div>
   </section>
+</div>
+
+<script>window.__INITIAL_STATE__ = {{ state_json | safe }};</script>
+<script>
+const fmt$ = (n, d=2) => n === null || n === undefined ? "—" : "$" + Number(n).toLocaleString(undefined, {minimumFractionDigits: d, maximumFractionDigits: d});
+const fmtPct = (n, d=2) => n === null || n === undefined ? "—" : (n >= 0 ? "+" : "") + Number(n).toFixed(d) + "%";
+const fmtNum = (n, d=6) => n === null || n === undefined ? "—" : Number(n).toLocaleString(undefined, {maximumFractionDigits: d});
+const timeAgo = (s) => s === null || s === undefined ? "—" : s < 60 ? s + "s ago" : Math.floor(s/60) + "m ago";
+const esc = (s) => (s ?? "").toString().replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+let state = window.__INITIAL_STATE__;
+let activeSymbol = (state.watchlist[0] && state.watchlist[0].symbol) || "BTC/USDT";
+let activeTf = "1h";
+let chart, candleSeries;
+
+function renderHeader(s) {
+  document.getElementById("h-balance").textContent = fmt$(s.portfolio_value);
+  const pnl = s.risk.daily_pnl;
+  const pnlEl = document.getElementById("h-pnl");
+  pnlEl.textContent = (pnl >= 0 ? "+" : "") + fmt$(pnl).replace("$", "$");
+  pnlEl.className = "value mono " + (pnl >= 0 ? "up" : "down");
+
+  const dot = document.getElementById("bot-dot"), text = document.getElementById("bot-text");
+  if (s.bot.status === "running") { dot.className = "dot on"; text.textContent = "ENGINE ACTIVE"; }
+  else if (s.bot.status === "stale") { dot.className = "dot off"; text.textContent = "ENGINE STALE (" + timeAgo(s.bot.seconds_ago) + ")"; }
+  else { dot.className = "dot"; text.textContent = "ENGINE UNKNOWN"; }
+
+  const killBtn = document.getElementById("kill-btn");
+  killBtn.textContent = s.risk.halted ? "RESUME TRADING" : "KILL TRADING";
+  killBtn.classList.toggle("engaged", s.risk.halted);
+}
+
+function renderWatchlist(s) {
+  const body = document.getElementById("watchlist-body");
+  body.innerHTML = s.watchlist.map(row => {
+    const chg = row.change_pct;
+    const chgClass = chg === null || chg === undefined ? "faint" : (chg >= 0 ? "up" : "down");
+    const sig = row.signal === "BUY" ? '<span class="badge buy">LONG</span>'
+              : row.signal === "SELL" ? '<span class="badge sell">EXIT</span>'
+              : '<span class="badge none">—</span>';
+    const cls = row.symbol === activeSymbol ? "clickable active-row" : "clickable";
+    return `<tr class="${cls}" onclick="selectSymbol('${row.symbol}')">
+      <td><b>${esc(row.symbol)}</b></td>
+      <td class="mono">${row.data_ok ? fmt$(row.price, row.price < 10 ? 4 : 2) : '<span class="faint">DATA OFFLINE</span>'}</td>
+      <td class="mono ${chgClass}">${fmtPct(chg)}</td>
+      <td class="mono dim">${row.volume ? fmt$(row.volume, 0) : "—"}</td>
+      <td>${sig}</td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="5" class="empty">No symbols configured.</td></tr>';
+}
+
+function renderRisk(s) {
+  const r = s.risk;
+  const positionsHtml = s.positions.length
+    ? s.positions.map(p => `
+        <div class="kv-row">
+          <span class="k">${esc(p.asset)} · ${fmtNum(p.amount, 6)} @ ${fmt$(p.avg_entry_price, 4)}</span>
+          <span class="v ${p.unrealized_pnl >= 0 ? 'up' : 'down'}">${p.unrealized_pnl !== null ? (p.unrealized_pnl>=0?'+':'') + fmt$(p.unrealized_pnl) : '—'}</span>
+        </div>`).join("")
+    : '<div class="empty">No open positions.</div>';
+
+  document.getElementById("risk-body").innerHTML = `
+    <div class="kv-row"><span class="k">Mode</span><span class="v">${s.mode} · ${esc(s.exchange)}</span></div>
+    <div class="kv-row"><span class="k">Daily P&amp;L</span><span class="v ${r.daily_pnl>=0?'up':'down'}">${fmt$(r.daily_pnl)}</span></div>
+    <div class="kv-row"><span class="k">Max Daily Loss</span><span class="v">${fmt$(-r.max_daily_loss)}</span></div>
+    <div class="kv-row"><span class="k">Open Positions</span><span class="v">${r.open_positions} / ${r.max_open_positions}</span></div>
+    <div class="kv-row"><span class="k">Position Size</span><span class="v">${r.position_size_pct}%</span></div>
+    <div class="kv-row"><span class="k">Min R:R</span><span class="v">1:${r.min_risk_reward}</span></div>
+    <div class="kv-row"><span class="k">Kill Switch</span><span class="v ${r.halted?'down':'up'}">${r.halted ? "ENGAGED" : "CLEAR"}</span></div>
+    ${r.daily_loss_breached ? '<div class="risk-note" style="margin-top:8px">⚠ Daily loss limit reached — new entries blocked until UTC midnight.</div>' : ''}
+    <div class="ptitle" style="margin:10px -12px -10px;">Positions</div>
+    <div style="padding-top:10px">${positionsHtml}</div>
+  `;
+}
+
+function renderAI(s) {
+  const reviewed = s.signals.filter(sig => sig.ai_approved !== null);
+  const body = document.getElementById("ai-body");
+  if (!reviewed.length) { body.innerHTML = '<div class="empty">No signals reviewed yet.</div>'; return; }
+  body.innerHTML = reviewed.slice(0, 8).map(sig => {
+    const verdict = sig.executed ? (sig.side === "buy" ? "LONG" : "EXIT") : (sig.ai_approved ? "APPROVED, NOT FILLED" : "NO TRADE");
+    const badgeCls = sig.executed ? (sig.side === "buy" ? "buy" : "sell") : (sig.ai_approved ? "neutral" : "none");
+    const isArb = sig.strategy === "triangular_arbitrage";
+    const statsGrid = isArb
+      ? `<div class="grid" style="grid-template-columns:1fr"><div><span>Net Edge</span>${((sig.price - 1) * 100).toFixed(3)}%</div></div>`
+      : `<div class="grid">
+          <div><span>Entry</span>${sig.price ? fmt$(sig.price, sig.price < 10 ? 4 : 2) : "—"}</div>
+          <div><span>Stop</span>${sig.stop_price ? fmt$(sig.stop_price, 4) : "—"}</div>
+          <div><span>Target</span>${sig.target_price ? fmt$(sig.target_price, 4) : "—"}</div>
+        </div>
+        <div class="grid" style="grid-template-columns:1fr 1fr">
+          <div><span>Risk/Reward</span>${sig.risk_reward ? "1:" + sig.risk_reward : "—"}</div>
+          <div><span>Strategy</span>${esc(sig.strategy)}</div>
+        </div>`;
+    return `<div class="ai-card">
+      <div class="row1"><span class="sym">${esc(sig.symbol)}</span><span class="badge ${badgeCls}">${verdict}</span></div>
+      ${statsGrid}
+      <div class="reasoning">${esc(sig.ai_reasoning || sig.details)}</div>
+      ${sig.risk_rejected_reason ? `<div class="risk-note">RISK ENGINE: ${esc(sig.risk_rejected_reason)}</div>` : ''}
+    </div>`;
+  }).join("");
+}
+
+function renderActivity(s) {
+  const body = document.getElementById("activity-body");
+  const feedHtml = !s.signals.length ? '<div class="empty">No activity yet.</div>' : s.signals.map(sig => {
+    const time = sig.timestamp.slice(11, 19);
+    let msg;
+    if (sig.executed) msg = `<b>${esc(sig.symbol)}</b> ${sig.side.toUpperCase()} executed via ${esc(sig.strategy)}`;
+    else if (sig.risk_rejected_reason) msg = `<b>${esc(sig.symbol)}</b> signal blocked by risk engine: ${esc(sig.risk_rejected_reason)}`;
+    else if (sig.ai_approved === false) msg = `<b>${esc(sig.symbol)}</b> signal rejected by AI review`;
+    else msg = `<b>${esc(sig.symbol)}</b> ${esc(sig.strategy)} signal detected`;
+    return `<div class="feed-item"><span class="t">${time}</span><span class="msg">${msg}</span></div>`;
+  }).join("");
+
+  const journalHtml = !s.trades.length ? '<div class="empty">No trades yet.</div>' : `
+    <table><thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Price</th><th>P&amp;L</th></tr></thead><tbody>
+    ${s.trades.map(t => `<tr>
+      <td class="mono faint">${t.timestamp.slice(11,19)}</td>
+      <td>${esc(t.symbol)}</td>
+      <td><span class="badge ${t.side}">${t.side.toUpperCase()}</span></td>
+      <td class="mono">${fmt$(t.price, t.price < 10 ? 4 : 2)}</td>
+      <td class="mono ${t.realized_pnl>=0?'up':'down'}">${t.realized_pnl ? (t.realized_pnl>=0?'+':'')+fmt$(t.realized_pnl) : "—"}</td>
+    </tr>`).join("")}
+    </tbody></table>`;
+
+  body.innerHTML = `
+    <div class="ptitle" style="margin:-10px -12px 10px;">Activity Feed</div>
+    ${feedHtml}
+    <div class="ptitle" style="margin:10px -12px 10px;">Trade Journal</div>
+    ${journalHtml}
+  `;
+}
+
+function render(s) {
+  state = s;
+  renderHeader(s);
+  renderWatchlist(s);
+  renderRisk(s);
+  renderAI(s);
+  renderActivity(s);
+}
+
+async function refresh() {
+  try {
+    const res = await fetch("/api/state");
+    render(await res.json());
+  } catch (e) { console.error("refresh failed", e); }
+}
+
+function selectSymbol(sym) {
+  activeSymbol = sym;
+  renderWatchlist(state);
+  loadChart();
+}
+
+async function loadChart() {
+  document.getElementById("chart-symbol").textContent = activeSymbol;
+  document.getElementById("chart-status").textContent = "Loading…";
+  try {
+    const res = await fetch(`/api/ohlcv?symbol=${encodeURIComponent(activeSymbol)}&timeframe=${activeTf}&limit=200`);
+    const candles = await res.json();
+    if (candles.error) throw new Error(candles.error);
+    candleSeries.setData(candles.map(c => ({ time: c.t, open: c.o, high: c.h, low: c.l, close: c.c })));
+    if (candles.length) {
+      document.getElementById("chart-price").textContent = fmt$(candles[candles.length-1].c, candles[candles.length-1].c < 10 ? 4 : 2);
+    }
+    chart.timeScale().fitContent();
+    document.getElementById("chart-status").textContent = "";
+
+    const lvlRes = await fetch(`/api/levels?symbol=${encodeURIComponent(activeSymbol)}`);
+    const levels = await lvlRes.json();
+    (candleSeries.priceLines || []).forEach(l => candleSeries.removePriceLine(l));
+    candleSeries.priceLines = [];
+    (levels.support || []).slice(0, 3).forEach(z => {
+      candleSeries.priceLines.push(candleSeries.createPriceLine({ price: z.price, color: "#26d07c", lineWidth: 1, lineStyle: 2, title: "S (" + z.touches + ")" }));
+    });
+    (levels.resistance || []).slice(0, 3).forEach(z => {
+      candleSeries.priceLines.push(candleSeries.createPriceLine({ price: z.price, color: "#f0454f", lineWidth: 1, lineStyle: 2, title: "R (" + z.touches + ")" }));
+    });
+  } catch (e) {
+    document.getElementById("chart-status").textContent = "DATA OFFLINE — " + e.message;
+  }
+}
+
+function initChart() {
+  const el = document.getElementById("chart-container");
+  chart = LightweightCharts.createChart(el, {
+    layout: { background: { color: "#111318" }, textColor: "#8a8f9c", fontFamily: "ui-monospace, monospace", fontSize: 11 },
+    grid: { vertLines: { color: "#1a1c22" }, horzLines: { color: "#1a1c22" } },
+    rightPriceScale: { borderColor: "#22252c" },
+    timeScale: { borderColor: "#22252c", timeVisible: true },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    autoSize: true,
+  });
+  candleSeries = chart.addCandlestickSeries({
+    upColor: "#26d07c", downColor: "#f0454f", borderVisible: false,
+    wickUpColor: "#26d07c", wickDownColor: "#f0454f",
+  });
+  candleSeries.priceLines = [];
+}
+
+document.querySelectorAll(".tf-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tf-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeTf = btn.dataset.tf;
+    loadChart();
+  });
+});
+
+document.getElementById("kill-btn").addEventListener("click", async () => {
+  const halted = !state.risk.halted;
+  const msg = halted
+    ? "Engage the kill switch? This immediately halts all scanning and execution — the bot will stop taking any action until you resume it."
+    : "Resume automated trading?";
+  if (!confirm(msg)) return;
+  await fetch("/api/kill-switch", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ halted }) });
+  refresh();
+});
+
+initChart();
+render(state);
+loadChart();
+setInterval(refresh, 20000);
+setInterval(loadChart, 60000);
+</script>
 </body>
 </html>

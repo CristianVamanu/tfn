@@ -9,6 +9,9 @@ class Signal:
     price: float
     reason: str
     confidence: float  # 0-1, heuristic strength of the signal
+    stop_price: float | None = None
+    target_price: float | None = None
+    risk_reward: float | None = None
 
 
 @dataclass
