@@ -144,6 +144,7 @@
   <span class="mode-badge paper" id="h-mode">PAPER</span>
   <button class="kill-btn" id="kill-btn">KILL TRADING</button>
 </header>
+<div id="error-banner" style="display:none; background:#3a1216; color:#ff8e93; border-bottom:1px solid var(--red); padding:8px 16px; font-family:var(--mono); font-size:12px; white-space:pre-wrap;"></div>
 
 <div class="terminal">
   <aside class="sidebar">
@@ -193,6 +194,15 @@
 
 <script>window.__INITIAL_STATE__ = {{ state_json | safe }};</script>
 <script>
+function showError(msg) {
+  const banner = document.getElementById("error-banner");
+  banner.style.display = "block";
+  banner.textContent = "ERROR: " + msg;
+  console.error(msg);
+}
+window.addEventListener("error", e => showError(e.message + " (" + (e.filename||"") + ":" + (e.lineno||"") + ")"));
+window.addEventListener("unhandledrejection", e => showError("Unhandled promise rejection: " + (e.reason && e.reason.message ? e.reason.message : e.reason)));
+
 const fmt$ = (n, d=2) => n === null || n === undefined ? "—" : "$" + Number(n).toLocaleString(undefined, {minimumFractionDigits: d, maximumFractionDigits: d});
 const fmtPct = (n, d=2) => n === null || n === undefined ? "—" : (n >= 0 ? "+" : "") + Number(n).toFixed(d) + "%";
 const fmtNum = (n, d=6) => n === null || n === undefined ? "—" : Number(n).toLocaleString(undefined, {maximumFractionDigits: d});
@@ -410,11 +420,15 @@ document.getElementById("kill-btn").addEventListener("click", async () => {
   refresh();
 });
 
-initChart();
+try {
+  initChart();
+  loadChart();
+  setInterval(loadChart, 60000);
+} catch (e) {
+  showError("Chart init failed: " + e.message);
+}
 render(state);
-loadChart();
 setInterval(refresh, 20000);
-setInterval(loadChart, 60000);
 </script>
 </body>
 </html>
