@@ -1,0 +1,15 @@
+[Unit]
+Description=AI Trading Platform - strategy scheduler loop
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/trading-platform
+ExecStart=/opt/trading-platform/venv/bin/python -m app.scheduler
+Restart=on-failure
+RestartSec=15
+User=trading
+Group=trading
+
+[Install]
+WantedBy=multi-user.target

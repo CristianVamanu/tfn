@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Trading Platform</title>
+<meta http-equiv="refresh" content="30">
+<style>
+  :root { color-scheme: dark; }
+  body { background: #0b0e14; color: #e6e6e6; font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 24px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .subtitle { color: #8b93a7; font-size: 13px; margin-bottom: 24px; }
+  .cards { display: flex; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; }
+  .card { background: #131826; border: 1px solid #1f2636; border-radius: 10px; padding: 16px 20px; min-width: 160px; }
+  .card .label { color: #8b93a7; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .card .value { font-size: 22px; font-weight: 600; margin-top: 4px; }
+  .pos { color: #3ecf8e; }
+  .neg { color: #f2545b; }
+  section { margin-bottom: 32px; }
+  section h2 { font-size: 15px; color: #c7cdda; border-bottom: 1px solid #1f2636; padding-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: #8b93a7; font-weight: 500; padding: 6px 10px; border-bottom: 1px solid #1f2636; }
+  td { padding: 6px 10px; border-bottom: 1px solid #161b28; vertical-align: top; }
+  tr:hover td { background: #10141f; }
+  .side-buy { color: #3ecf8e; }
+  .side-sell { color: #f2545b; }
+  .approved { color: #3ecf8e; }
+  .rejected { color: #f2545b; }
+  .pending { color: #8b93a7; }
+  .reason { color: #8b93a7; max-width: 420px; }
+  .mono { font-variant-numeric: tabular-nums; }
+  .empty { color: #565f75; font-style: italic; padding: 12px; }
+</style>
+</head>
+<body>
+  <h1>AI Trading Platform</h1>
+  <div class="subtitle">Paper trading &middot; refreshes every 30s</div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="label">Portfolio value</div>
+      <div class="value">${{ "%.2f"|format(state.portfolio_value) }}</div>
+    </div>
+    <div class="card">
+      <div class="label">Cash (USDT)</div>
+      <div class="value">${{ "%.2f"|format(state.cash_usdt) }}</div>
+    </div>
+    <div class="card">
+      <div class="label">Realized P&amp;L (last 30 trades)</div>
+      <div class="value {{ 'pos' if state.realized_pnl_recent >= 0 else 'neg' }}">
+        {{ "%+.2f"|format(state.realized_pnl_recent) }}
+      </div>
+    </div>
+  </div>
+
+  <section>
+    <h2>Balances</h2>
+    <table>
+      <tr><th>Asset</th><th>Amount</th></tr>
+      {% for b in state.balances %}
+      <tr><td>{{ b.asset }}</td><td class="mono">{{ "%.8g"|format(b.amount) }}</td></tr>
+      {% endfor %}
+    </table>
+  </section>
+
+  <section>
+    <h2>Open Positions</h2>
+    {% if state.positions %}
+    <table>
+      <tr><th>Asset</th><th>Amount</th><th>Avg Entry</th><th>Live Price</th><th>Market Value</th><th>Unrealized P&amp;L</th></tr>
+      {% for p in state.positions %}
+      <tr>
+        <td>{{ p.asset }}</td>
+        <td class="mono">{{ "%.8g"|format(p.amount) }}</td>
+        <td class="mono">${{ "%.4f"|format(p.avg_entry_price) }}</td>
+        <td class="mono">{{ "$%.4f"|format(p.live_price) if p.live_price else "—" }}</td>
+        <td class="mono">{{ "$%.2f"|format(p.market_value) if p.market_value else "—" }}</td>
+        <td class="mono {{ 'pos' if p.unrealized_pnl and p.unrealized_pnl >= 0 else 'neg' }}">
+          {{ "%+.2f"|format(p.unrealized_pnl) if p.unrealized_pnl is not none else "—" }}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <div class="empty">No open positions.</div>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Recent Trades</h2>
+    {% if state.trades %}
+    <table>
+      <tr><th>Time (UTC)</th><th>Strategy</th><th>Symbol</th><th>Side</th><th>Price</th><th>Amount</th><th>Fee</th><th>Realized P&amp;L</th></tr>
+      {% for t in state.trades %}
+      <tr>
+        <td>{{ t.timestamp[:19] }}</td>
+        <td>{{ t.strategy }}</td>
+        <td>{{ t.symbol }}</td>
+        <td class="side-{{ t.side }}">{{ t.side }}</td>
+        <td class="mono">{{ "%.6g"|format(t.price) }}</td>
+        <td class="mono">{{ "%.6g"|format(t.amount) }}</td>
+        <td class="mono">{{ "%.4f"|format(t.fee) }}</td>
+        <td class="mono {{ 'pos' if t.realized_pnl >= 0 else 'neg' }}">{{ "%+.2f"|format(t.realized_pnl) }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <div class="empty">No trades yet.</div>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Recent Signals &amp; AI Decisions</h2>
+    {% if state.signals %}
+    <table>
+      <tr><th>Time (UTC)</th><th>Strategy</th><th>Symbol</th><th>Side</th><th>Reason</th><th>AI</th><th>AI Reasoning</th><th>Executed</th></tr>
+      {% for s in state.signals %}
+      <tr>
+        <td>{{ s.timestamp[:19] }}</td>
+        <td>{{ s.strategy }}</td>
+        <td>{{ s.symbol }}</td>
+        <td class="side-{{ s.side }}">{{ s.side }}</td>
+        <td class="reason">{{ s.details }}</td>
+        <td class="{{ 'approved' if s.ai_approved else ('rejected' if s.ai_approved == false else 'pending') }}">
+          {{ "approved" if s.ai_approved else ("rejected" if s.ai_approved == false else "pending") }}
+        </td>
+        <td class="reason">{{ s.ai_reasoning }}</td>
+        <td>{{ "yes" if s.executed else "no" }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <div class="empty">No signals yet.</div>
+    {% endif %}
+  </section>
+</body>
+</html>

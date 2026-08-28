@@ -1,0 +1,15 @@
+[Unit]
+Description=AI Trading Platform - web dashboard
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/trading-platform
+ExecStart=/opt/trading-platform/venv/bin/uvicorn app.dashboard.server:app --host 127.0.0.1 --port 8001
+Restart=on-failure
+RestartSec=10
+User=trading
+Group=trading
+
+[Install]
+WantedBy=multi-user.target
