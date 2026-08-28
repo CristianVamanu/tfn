@@ -26,6 +26,7 @@ class Config:
     min_risk_reward: float = float(os.getenv("MIN_RISK_REWARD", "1.5"))
     scan_interval_seconds: int = int(os.getenv("SCAN_INTERVAL_SECONDS", "60"))
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
+    anthropic_workspace_id: str = os.getenv("ANTHROPIC_WORKSPACE_ID", "")
     claude_model: str = os.getenv("CLAUDE_MODEL", "claude-sonnet-5")
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///./data/trading.db")
     dashboard_port: int = int(os.getenv("DASHBOARD_PORT", "8001"))

@@ -25,7 +25,8 @@ def review_signal(strategy: str, symbol: str, side: str, price: float, reason: s
     if not config.anthropic_api_key:
         return True, 0.5, "AI review skipped: no ANTHROPIC_API_KEY configured, auto-approving."
 
-    client = Anthropic(api_key=config.anthropic_api_key)
+    extra_headers = {"anthropic-workspace-id": config.anthropic_workspace_id} if config.anthropic_workspace_id else {}
+    client = Anthropic(api_key=config.anthropic_api_key, default_headers=extra_headers)
     user_prompt = (
         f"Strategy: {strategy}\n"
         f"Symbol/path: {symbol}\n"
