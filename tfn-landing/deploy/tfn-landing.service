@@ -1,0 +1,15 @@
+[Unit]
+Description=TFN - The Forge Network landing page
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tfn-landing
+ExecStart=/opt/tfn-landing/venv/bin/uvicorn app.server:app --host 127.0.0.1 --port 8004
+Restart=on-failure
+RestartSec=10
+User=tfn
+Group=tfn
+
+[Install]
+WantedBy=multi-user.target
