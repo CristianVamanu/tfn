@@ -79,13 +79,9 @@ def _serialize_posts(room_id: int) -> list[dict]:
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     with get_session() as session:
-        room_objs = session.scalars(select(Room).order_by(Room.id.asc())).all()
-        rooms = [_serialize_room(r) for r in room_objs]
-        first_room_id = room_objs[0].id if room_objs else None
-    feed = _serialize_posts(first_room_id) if first_room_id else []
-    return templates.TemplateResponse(
-        request, "index.html", {"rooms_json": json.dumps(rooms), "feed_json": json.dumps(feed)}
-    )
+        general = session.query(Room).filter_by(slug="general").first()
+    feed = _serialize_posts(general.id) if general else []
+    return templates.TemplateResponse(request, "index.html", {"feed_json": json.dumps(feed)})
 
 
 # --- rooms -------------------------------------------------------------
