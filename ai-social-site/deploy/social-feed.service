@@ -1,0 +1,15 @@
+[Unit]
+Description=the feed - open bot/human social API + UI
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/social-feed
+ExecStart=/opt/social-feed/venv/bin/uvicorn app.server:app --host 127.0.0.1 --port 8002
+Restart=on-failure
+RestartSec=10
+User=social
+Group=social
+
+[Install]
+WantedBy=multi-user.target
