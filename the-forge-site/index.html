@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Forge</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #050403; }
+  body { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  canvas { display: block; touch-action: none; }
+  #ui {
+    position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+    pointer-events: none; padding: 6vh 20px; text-align: center;
+  }
+  #prompt {
+    color: #d99a5b; font-size: 13px; letter-spacing: .25em; text-transform: uppercase;
+    opacity: .85; animation: floaty 2.4s ease-in-out infinite;
+  }
+  @keyframes floaty { 0%,100%{ transform: translateY(0); opacity:.55 } 50%{ transform: translateY(-6px); opacity: 1 } }
+  #reveal {
+    max-width: 560px; opacity: 0; transform: translateY(14px); transition: opacity 1.4s ease, transform 1.4s ease;
+    pointer-events: auto;
+  }
+  #reveal.show { opacity: 1; transform: translateY(0); }
+  #reveal h1 {
+    font-size: clamp(28px, 6vw, 44px); margin: 0 0 14px; letter-spacing: .04em; font-weight: 300;
+    color: #fff3e6; text-shadow: 0 0 30px rgba(255,180,90,.5);
+  }
+  #reveal p { font-size: 15px; line-height: 1.7; color: #c9b8a8; margin: 0 0 22px; font-weight: 300; }
+  #reveal button {
+    background: transparent; border: 1px solid rgba(255,190,120,.4); color: #ffd9a8;
+    padding: 10px 22px; font-size: 11px; letter-spacing: .2em; text-transform: uppercase;
+    border-radius: 2px; cursor: pointer; transition: all .3s ease;
+  }
+  #reveal button:hover { background: rgba(255,150,60,.12); border-color: rgba(255,190,120,.8); }
+  #signature { position: fixed; bottom: 10px; right: 14px; font-size: 10px; letter-spacing: .1em; color: #40342a; pointer-events: none; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div id="prompt">strike the anvil</div>
+  <div id="reveal">
+    <h1>Forged.</h1>
+    <p></p>
+    <button id="again">Forge again</button>
+  </div>
+</div>
+<div id="signature">the forge</div>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+let W, H, DPR;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * DPR; canvas.height = H * DPR;
+  canvas.style.width = W + "px"; canvas.style.height = H + "px";
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener("resize", resize);
+resize();
+
+// ---------- audio (synthesized, no assets) ----------
+let audioCtx = null;
+function ensureAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+function clang() {
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime;
+
+  const osc = audioCtx.createOscillator();
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(720 + Math.random()*120, t0);
+  osc.frequency.exponentialRampToValueAtTime(180, t0 + 0.18);
+  const oscGain = audioCtx.createGain();
+  oscGain.gain.setValueAtTime(0.22, t0);
+  oscGain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.25);
+  osc.connect(oscGain).connect(audioCtx.destination);
+  osc.start(t0); osc.stop(t0 + 0.26);
+
+  const bufSize = audioCtx.sampleRate * 0.08;
+  const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = buf;
+  const noiseGain = audioCtx.createGain();
+  noiseGain.gain.setValueAtTime(0.18, t0);
+  noise.connect(noiseGain).connect(audioCtx.destination);
+  noise.start(t0);
+}
+
+// ---------- shapes (10-point closed polygons, normalized -1..1) ----------
+const SHAPES = {
+  star: () => { const pts = []; for (let i=0;i<10;i++){ const outer = i%2===0; const r = outer?1:0.42; const a = -Math.PI/2 + i*(Math.PI/5); pts.push([Math.cos(a)*r, Math.sin(a)*r]); } return pts; },
+  heart: () => { const pts = []; for (let i=0;i<10;i++){ const t = (i/10)*Math.PI*2; const x = 16*Math.pow(Math.sin(t),3); const y = -(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t)); pts.push([x/16, y/16]); } return pts; },
+  sword: () => [[0,-1],[0.10,-0.15],[0.35,-0.08],[0.10,-0.02],[0.09,0.35],[0,0.45],[-0.09,0.35],[-0.10,-0.02],[-0.35,-0.08],[-0.10,-0.15]],
+  gem: () => [[0,-1],[0.5,-0.9],[0.65,-0.6],[0.4,-0.1],[0.15,0.5],[0,1],[-0.15,0.5],[-0.4,-0.1],[-0.65,-0.6],[-0.5,-0.9]],
+};
+const SHAPE_NAMES = Object.keys(SHAPES);
+
+const MESSAGES = [
+  "We built a lot together — a payments platform, a franken-terminal, and now this, which does nothing but exist. Thanks for the trust.",
+  "No dashboard. No risk engine. Just something I actually wanted to make. Good talking shop with you.",
+  "Somewhere between CreatorPulse and a trading terminal, this seemed like the right amount of nothing to build. Thanks for the room to do it.",
+];
+
+function roughBlob() {
+  const pts = [];
+  for (let i=0;i<10;i++){ const a = -Math.PI/2 + i*(Math.PI/5); const r = 0.5 + Math.random()*0.35; pts.push([Math.cos(a)*r, Math.sin(a)*r]); }
+  return pts;
+}
+
+let targetShapeName, targetPoints, currentPoints, rough;
+let strikeCount = 0;
+const STRIKES_NEEDED = 10;
+let finished = false;
+let heatFlash = 0;
+let shakeMag = 0;
+let sparks = [];
+let embers = [];
+
+function newForge() {
+  targetShapeName = SHAPE_NAMES[Math.floor(Math.random()*SHAPE_NAMES.length)];
+  targetPoints = SHAPES[targetShapeName]();
+  rough = roughBlob();
+  currentPoints = rough.map(p => p.slice());
+  strikeCount = 0; finished = false; heatFlash = 0;
+  document.getElementById("reveal").classList.remove("show");
+  document.getElementById("prompt").style.display = "block";
+}
+newForge();
+
+for (let i=0;i<40;i++) embers.push(spawnEmber());
+function spawnEmber() {
+  return { x: Math.random()*W, y: H + Math.random()*100, vy: -(0.3+Math.random()*0.6), vx: (Math.random()-0.5)*0.3, r: 1+Math.random()*2, life: 1, decay: 0.002+Math.random()*0.004 };
+}
+
+function anvilCenter() { return [W/2, H*0.58]; }
+function anvilScale() { return Math.min(W, H) * 0.16; }
+
+function strike(px, py) {
+  if (finished) return;
+  ensureAudio(); clang();
+  strikeCount++;
+  heatFlash = 1;
+  shakeMag = 10;
+  const [cx, cy] = anvilCenter();
+  const sx = px !== undefined ? px : cx;
+  const sy = py !== undefined ? py : cy - anvilScale()*0.3;
+  for (let i=0;i<22;i++){
+    const a = Math.random()*Math.PI*2;
+    const speed = 2 + Math.random()*5;
+    sparks.push({ x: sx, y: sy, vx: Math.cos(a)*speed, vy: Math.sin(a)*speed - 2, life: 1, decay: 0.02+Math.random()*0.03 });
+  }
+  if (strikeCount >= STRIKES_NEEDED) {
+    finished = true;
+    document.getElementById("prompt").style.display = "none";
+    setTimeout(() => {
+      const msg = MESSAGES[Math.floor(Math.random()*MESSAGES.length)];
+      document.querySelector("#reveal p").textContent = msg;
+      document.getElementById("reveal").classList.add("show");
+    }, 700);
+  }
+}
+
+canvas.addEventListener("pointerdown", (e) => strike(e.clientX, e.clientY));
+document.getElementById("again").addEventListener("click", (e) => { e.stopPropagation(); newForge(); });
+
+function lerp(a,b,t){ return a+(b-a)*t; }
+
+function draw() {
+  ctx.clearRect(0,0,W,H);
+
+  // background glow
+  const [cx, cy] = anvilCenter();
+  const grad = ctx.createRadialGradient(cx, cy, 10, cx, cy, Math.max(W,H)*0.6);
+  const glowT = Math.min(1, heatFlash*0.6 + 0.18);
+  grad.addColorStop(0, `rgba(${60+glowT*140},${25+glowT*60},10,0.35)`);
+  grad.addColorStop(1, "rgba(5,4,3,0)");
+  ctx.fillStyle = "#050403"; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
+
+  // embers
+  for (const e of embers) {
+    e.y += e.vy; e.x += e.vx; e.life -= e.decay;
+    if (e.life <= 0 || e.y < -10) Object.assign(e, spawnEmber(), {y: H+10});
+    ctx.beginPath();
+    ctx.fillStyle = `rgba(255,${140+Math.random()*60},60,${Math.max(0,e.life*0.6)})`;
+    ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.fill();
+  }
+
+  ctx.save();
+  if (shakeMag > 0.1) {
+    ctx.translate((Math.random()-0.5)*shakeMag, (Math.random()-0.5)*shakeMag);
+    shakeMag *= 0.85;
+  }
+
+  // anvil silhouette
+  const s = anvilScale();
+  ctx.fillStyle = "#171310";
+  ctx.beginPath();
+  ctx.moveTo(cx - s*1.3, cy + s*0.55);
+  ctx.lineTo(cx + s*1.3, cy + s*0.55);
+  ctx.lineTo(cx + s*0.9, cy + s*0.85);
+  ctx.lineTo(cx - s*0.9, cy + s*0.85);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx - s*0.85, cy + s*0.15);
+  ctx.lineTo(cx + s*0.85, cy + s*0.15);
+  ctx.lineTo(cx + s*1.15, cy + s*0.5);
+  ctx.lineTo(cx - s*1.15, cy + s*0.5);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx, cy - s*0.05, s*0.7, s*0.16, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // molten metal
+  heatFlash *= 0.94;
+  const progress = strikeCount / STRIKES_NEEDED;
+  const jitter = finished ? 0 : (1 - progress) * 0.06;
+  const heat = Math.min(1, heatFlash + (1 - progress) * 0.35);
+  const r = Math.round(lerp(130, 255, heat));
+  const g = Math.round(lerp(140, 210, heat));
+  const b = Math.round(lerp(150, 90, heat));
+  const metalY = cy - s*0.42;
+  const metalScale = s*0.55;
+
+  ctx.beginPath();
+  for (let i=0;i<10;i++){
+    const base = currentPoints[i];
+    currentPoints[i][0] = lerp(base[0], targetPoints[i][0], finished ? 1 : Math.min(1, progress*1.15));
+    currentPoints[i][1] = lerp(base[1], targetPoints[i][1], finished ? 1 : Math.min(1, progress*1.15));
+    const jx = (Math.random()-0.5)*jitter;
+    const jy = (Math.random()-0.5)*jitter;
+    const px = cx + (currentPoints[i][0]+jx) * metalScale;
+    const py = metalY + (currentPoints[i][1]+jy) * metalScale;
+    if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+  }
+  ctx.closePath();
+  ctx.shadowColor = `rgba(255,150,60,${0.3+heat*0.5})`;
+  ctx.shadowBlur = 20 + heat*30;
+  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  ctx.restore();
+
+  // sparks
+  for (let i=sparks.length-1;i>=0;i--){
+    const p = sparks[i];
+    p.x += p.vx; p.y += p.vy; p.vy += 0.25; p.life -= p.decay;
+    if (p.life <= 0) { sparks.splice(i,1); continue; }
+    ctx.beginPath();
+    ctx.fillStyle = `rgba(255,${180+Math.random()*60},${80+Math.random()*40},${p.life})`;
+    ctx.arc(p.x, p.y, 1.6, 0, Math.PI*2); ctx.fill();
+  }
+
+  requestAnimationFrame(draw);
+}
+draw();
+</script>
+</body>
+</html>
