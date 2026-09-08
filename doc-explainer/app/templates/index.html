@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>plain english</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #101114; color: #e7e8ec; font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  header { padding: 22px 24px 14px; border-bottom: 1px solid #24262c; }
+  header h1 { margin: 0; font-size: 21px; font-weight: 700; }
+  header p { margin: 4px 0 0; font-size: 13px; color: #8b8f9c; max-width: 640px; }
+
+  .layout { display: grid; grid-template-columns: 380px 1fr; gap: 0; min-height: calc(100vh - 78px); }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+  .side { border-right: 1px solid #24262c; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .side input[type=text] { background: #16171c; border: 1px solid #2a2c33; color: #e7e8ec; padding: 8px 10px; border-radius: 6px; font-size: 13px; }
+  .side textarea { background: #16171c; border: 1px solid #2a2c33; color: #e7e8ec; padding: 10px; border-radius: 8px; font-size: 13.5px; font-family: ui-monospace, monospace; resize: vertical; min-height: 260px; line-height: 1.5; }
+  .side button { background: #4f8cff; color: #fff; border: none; padding: 10px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .side button:disabled { opacity: .5; cursor: default; }
+  .hint { font-size: 11.5px; color: #6b6f7c; }
+
+  .history { margin-top: 6px; }
+  .history h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #6b6f7c; margin: 0 0 8px; }
+  .history-item { padding: 8px 8px; border-radius: 6px; cursor: pointer; font-size: 12.5px; color: #b7bac4; }
+  .history-item:hover { background: #191b21; }
+  .history-item .t { color: #6b6f7c; font-size: 10.5px; }
+  .history-empty { font-size: 12px; color: #6b6f7c; font-style: italic; }
+
+  .main { padding: 26px 32px; max-width: 780px; }
+  .placeholder { color: #6b6f7c; font-size: 14px; padding-top: 40px; text-align: center; }
+
+  .risk-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 14px; }
+  .risk-low { background: rgba(60,200,120,.15); color: #4fd67f; }
+  .risk-medium { background: rgba(230,180,60,.15); color: #e8c15a; }
+  .risk-high { background: rgba(240,80,90,.15); color: #f26b78; }
+  .risk-unknown { background: rgba(140,140,150,.15); color: #a9acb5; }
+
+  .doc-type { color: #8b8f9c; font-size: 13px; margin-bottom: 4px; }
+  h2.summary-title { font-size: 15px; margin: 18px 0 6px; color: #c9cbd3; }
+  .summary { font-size: 15.5px; line-height: 1.6; color: #dfe1e6; }
+
+  .clause { border: 1px solid #24262c; border-radius: 10px; padding: 14px 16px; margin: 10px 0; }
+  .clause .sev { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; display: inline-block; }
+  .clause blockquote { margin: 6px 0 8px; padding: 8px 12px; border-left: 3px solid #383b44; background: #16171c; font-style: italic; font-size: 13.5px; color: #b7bac4; }
+  .clause .explain { font-size: 14px; color: #dfe1e6; line-height: 1.5; }
+
+  .questions { margin-top: 8px; }
+  .questions li { margin-bottom: 6px; font-size: 14px; line-height: 1.5; }
+
+  .empty-section { font-size: 13px; color: #6b6f7c; font-style: italic; }
+  #error-banner { display:none; background:#3a1216; color:#ff8e93; padding:8px 16px; font-family:monospace; font-size:12px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<div id="error-banner"></div>
+<header>
+  <h1>plain english</h1>
+  <p>paste a contract, lease, or terms of service and get a plain-English read on what it actually commits you to. not a lawyer, won't pretend to be one - just a careful second read before you sign.</p>
+</header>
+
+<div class="layout">
+  <div class="side">
+    <input type="text" id="title-input" placeholder="what is this? (e.g. apartment lease)">
+    <textarea id="text-input" placeholder="paste the document text here..."></textarea>
+    <button id="analyze-btn">Analyze</button>
+    <div class="hint" id="status-hint"></div>
+    <div class="history">
+      <h3>Recent</h3>
+      <div id="history-list"></div>
+    </div>
+  </div>
+
+  <div class="main" id="main">
+    <div class="placeholder">Paste a document on the left to get started.</div>
+  </div>
+</div>
+
+<script>
+window.__INITIAL_HISTORY__ = {{ history_json | safe }};
+</script>
+<script>
+function showError(msg) {
+  const b = document.getElementById("error-banner");
+  b.style.display = "block"; b.textContent = "ERROR: " + msg; console.error(msg);
+}
+window.addEventListener("error", e => showError(e.message));
+window.addEventListener("unhandledrejection", e => showError("Unhandled: " + (e.reason && e.reason.message ? e.reason.message : e.reason)));
+
+const esc = (s) => (s ?? "").toString().replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const timeAgo = (iso) => {
+  const s = Math.floor((Date.now() - new Date(iso + "Z").getTime()) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.floor(s/60) + "m ago";
+  if (s < 86400) return Math.floor(s/3600) + "h ago";
+  return Math.floor(s/86400) + "d ago";
+};
+
+let history = window.__INITIAL_HISTORY__;
+
+function renderHistory() {
+  const el = document.getElementById("history-list");
+  if (!history.length) { el.innerHTML = '<div class="history-empty">Nothing analyzed yet.</div>'; return; }
+  el.innerHTML = history.map(h => `
+    <div class="history-item" onclick="loadAnalysis(${h.id})">
+      <div>${esc(h.title)}</div>
+      <div class="t">${timeAgo(h.created_at)}</div>
+    </div>
+  `).join("");
+}
+
+function renderResult(data) {
+  const r = data.result;
+  const risk = (r.overall_risk || "unknown").toLowerCase();
+  const clauses = r.flagged_clauses || [];
+  const questions = r.questions_to_ask || [];
+
+  document.getElementById("main").innerHTML = `
+    <div class="risk-badge risk-${esc(risk)}">${esc(risk)} risk</div>
+    <div class="doc-type">${esc(r.document_type || "")}</div>
+    <div class="summary">${esc(r.summary || "")}</div>
+
+    <h2 class="summary-title">Worth a closer look</h2>
+    ${clauses.length ? clauses.map(c => `
+      <div class="clause">
+        <span class="sev risk-${esc((c.severity||'low').toLowerCase())}">${esc(c.severity || "low")}</span>
+        <blockquote>${esc(c.quote)}</blockquote>
+        <div class="explain">${esc(c.explanation)}</div>
+      </div>
+    `).join("") : '<div class="empty-section">Nothing flagged - this reads as fairly standard.</div>'}
+
+    <h2 class="summary-title">Questions worth asking</h2>
+    ${questions.length ? `<ul class="questions">${questions.map(q => `<li>${esc(q)}</li>`).join("")}</ul>` : '<div class="empty-section">No specific questions surfaced.</div>'}
+  `;
+}
+
+async function loadAnalysis(id) {
+  const res = await fetch(`/api/analysis/${id}`);
+  const data = await res.json();
+  if (data.error) { showError(data.error); return; }
+  renderResult(data);
+}
+
+document.getElementById("analyze-btn").addEventListener("click", async () => {
+  const text = document.getElementById("text-input").value.trim();
+  const title = document.getElementById("title-input").value.trim() || "untitled document";
+  if (!text) { showError("paste some document text first"); return; }
+
+  const btn = document.getElementById("analyze-btn");
+  const hint = document.getElementById("status-hint");
+  btn.disabled = true;
+  hint.textContent = "Reading it over...";
+
+  try {
+    const res = await fetch("/api/analyze", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ title, text })
+    });
+    const data = await res.json();
+    if (data.error) { showError(data.error); return; }
+    renderResult(data);
+    history.unshift({ id: data.id, created_at: data.created_at, title: data.title });
+    renderHistory();
+    hint.textContent = "";
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+renderHistory();
+</script>
+</body>
+</html>

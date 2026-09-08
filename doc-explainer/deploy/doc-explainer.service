@@ -1,0 +1,15 @@
+[Unit]
+Description=plain english - document/contract explainer
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/doc-explainer
+ExecStart=/opt/doc-explainer/venv/bin/uvicorn app.server:app --host 127.0.0.1 --port 8003
+Restart=on-failure
+RestartSec=10
+User=explainer
+Group=explainer
+
+[Install]
+WantedBy=multi-user.target
