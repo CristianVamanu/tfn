@@ -51,7 +51,10 @@ if __name__ == "__main__":
     ETHUSDT_BINANCE = TestInstrumentProvider.ethusdt_binance()
     engine.add_instrument(ETHUSDT_BINANCE)
 
-    provider = TestDataProvider()
+    # TestDataProvider defaults to fetching from GitHub's "develop" branch, which
+    # is now the v2 rewrite and no longer has this file at this path. We're on
+    # the legacy v1 line (1.231.0), so pin it to the matching branch.
+    provider = TestDataProvider(branch="develop_v1")
     wrangler = TradeTickDataWrangler(instrument=ETHUSDT_BINANCE)
     ticks = wrangler.process(provider.read_csv_ticks("binance/ethusdt-trades.csv"))
     engine.add_data(ticks)
