@@ -6,22 +6,27 @@ learning hub) is a labelled product preview, not working product. This is
 the feature list to turn it into a real MVP, in build order.
 
 ## Phase 0 — Foundations (blocking everything below)
-- [ ] Postgres instead of SQLite (concurrent writes, backups, room to grow)
+- [x] MySQL instead of SQLite (VPS already ran MySQL 8 - wired it up,
+      migrated existing waitlist data with `scripts/migrate_sqlite_to_mysql.py`)
 - [ ] Alembic migrations instead of `Base.metadata.create_all`
-- [ ] Auth: email/password signup + login, sessions, password reset
+- [x] Auth: email/password signup + login, sessions, password reset
+      (reset-by-email still missing - only in-session password change exists)
 - [ ] Cloudflare R2 wired in (`app/storage.py` already scaffolded) for
       avatars first, marketplace files in Phase 2
-- [ ] Basic account settings page (email, password, avatar upload)
+- [x] Basic account settings page (`/account` - password change; no email
+      change or avatar upload yet)
 
 ## Phase 1 — The Forge (the core product loop)
-- [ ] Onboarding flow: goal, business model, time available
+- [x] Onboarding flow: goal, business model, time available (`/dashboard`)
 - [ ] AI-generated phased roadmap (Claude API call, stored per user, not
-      regenerated on every page load)
-- [ ] Roadmap step tracking: mark done / current / upcoming
+      regenerated on every page load) — **needs an Anthropic API key**;
+      until then, `/dashboard` uses curated (not AI) templates per
+      business model, `app/roadmap_templates.py`
+- [x] Roadmap step tracking: mark done / current / upcoming
 - [ ] AI advisor chat scoped to the user's own Forge + roadmap context,
-      with persisted conversation history
+      with persisted conversation history — **needs an Anthropic API key**
 - [ ] Daily missions derived from the current roadmap phase
-- [ ] Real dashboard replacing the current mockup bento cards
+- [x] Real dashboard replacing the current mockup bento cards
 
 ## Phase 2 — Network + Marketplace (needs real payment/legal infra first)
 - [ ] Build-in-public feed: posts, congrats/reactions, follows
@@ -44,8 +49,9 @@ the feature list to turn it into a real MVP, in build order.
       needs a transactional email provider (Postmark/Resend/SES)
 
 ## Phase 4 — Admin + polish
-- [ ] Admin login for you: edit landing copy, view/export waitlist,
-      moderate network posts and marketplace listings
+- [x] Admin login for you: `/admin` shows registered users + waitlist
+      (edit landing copy, moderate network/marketplace still pending
+      those features existing in the first place)
 - [ ] Analytics on the funnel (waitlist → signup → first roadmap step)
 - [ ] Rate limiting on public endpoints (`/api/waitlist` included)
 
