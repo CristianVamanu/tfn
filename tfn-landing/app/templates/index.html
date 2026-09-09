@@ -185,6 +185,26 @@
   .waitlist-status.err { color: #f26b78; }
   .waitlist-count { font-size: 12.5px; color: var(--text-faint); margin-top: 10px; }
 
+  /* portal intro (reference-video-style bracket fly-through) */
+  .portal-intro { position: fixed; inset: 0; z-index: 999; background: #050506; display: flex; align-items: center; justify-content: center; transition: opacity .5s ease; }
+  .portal-intro.hide { opacity: 0; pointer-events: none; }
+  .portal-intro[hidden] { display: none; }
+  .portal-frame { position: relative; width: 60vmin; height: 60vmin; max-width: 600px; max-height: 600px; transform: scale(2.6); opacity: 0; transition: transform 1.1s cubic-bezier(.7,0,.3,1), opacity .35s ease; }
+  .portal-intro.animate .portal-frame { transform: scale(.46); opacity: 1; }
+  .portal-corner { position: absolute; width: 15%; height: 15%; }
+  .portal-corner::before, .portal-corner::after { content: ""; position: absolute; background: var(--gold-text); box-shadow: 0 0 16px var(--gold); }
+  .portal-corner::before { width: 100%; height: 3px; }
+  .portal-corner::after { width: 3px; height: 100%; }
+  .portal-corner.tl { top: 0; left: 0; } .portal-corner.tl::before, .portal-corner.tl::after { top: 0; left: 0; border-radius: 3px 0 0 0; }
+  .portal-corner.tr { top: 0; right: 0; } .portal-corner.tr::before, .portal-corner.tr::after { top: 0; right: 0; border-radius: 0 3px 0 0; }
+  .portal-corner.bl { bottom: 0; left: 0; } .portal-corner.bl::before, .portal-corner.bl::after { bottom: 0; left: 0; border-radius: 0 0 0 3px; }
+  .portal-corner.br { bottom: 0; right: 0; } .portal-corner.br::before, .portal-corner.br::after { bottom: 0; right: 0; border-radius: 0 0 3px 0; }
+  .portal-emblem { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 13vmin; letter-spacing: -.02em; background: linear-gradient(135deg, var(--gold-text), var(--indigo)); -webkit-background-clip: text; background-clip: text; color: transparent; opacity: 0; transition: opacity .5s ease .45s; }
+  .portal-intro.animate .portal-emblem { opacity: 1; }
+  .portal-flash { position: fixed; inset: 0; z-index: 998; background: radial-gradient(circle, rgba(247,199,102,.9), rgba(240,178,62,0) 60%); opacity: 0; pointer-events: none; }
+  .portal-flash.fire { animation: flashPop .55s ease-out forwards; }
+  @keyframes flashPop { 0% { opacity: 0; } 35% { opacity: .85; } 100% { opacity: 0; } }
+
   footer { padding: 50px 0 40px; border-top: 1px solid var(--border-soft); }
   .foot-grid { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 30px; }
   .foot-cols { display: flex; gap: 60px; flex-wrap: wrap; }
@@ -195,6 +215,17 @@
 </style>
 </head>
 <body>
+
+<div class="portal-intro" id="portal-intro">
+  <div class="portal-frame">
+    <span class="portal-corner tl"></span>
+    <span class="portal-corner tr"></span>
+    <span class="portal-corner bl"></span>
+    <span class="portal-corner br"></span>
+    <div class="portal-emblem">TFN</div>
+  </div>
+</div>
+<div class="portal-flash" id="portal-flash"></div>
 
 <nav class="topnav">
   <div class="container">
@@ -416,6 +447,28 @@ const io = new IntersectionObserver((entries) => {
 }, { threshold: 0.15 });
 revealEls.forEach(el => io.observe(el));
 
+// ---------- portal intro (bracket fly-through, then reveal) ----------
+(function initPortal() {
+  const portal = document.getElementById("portal-intro");
+  const flash = document.getElementById("portal-flash");
+  const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function finish() {
+    portal.classList.add("hide");
+    setTimeout(() => portal.setAttribute("hidden", ""), 550);
+  }
+
+  if (reduceMotion) { finish(); return; }
+
+  requestAnimationFrame(() => requestAnimationFrame(() => portal.classList.add("animate")));
+  setTimeout(() => flash.classList.add("fire"), 950);
+  setTimeout(finish, 1150);
+  setTimeout(() => flash.remove(), 1700);
+
+  // safety net: never let a stalled animation block the page
+  setTimeout(finish, 3000);
+})();
+
 // ---------- waitlist ----------
 document.getElementById("waitlist-form").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -458,7 +511,8 @@ document.getElementById("waitlist-form").addEventListener("submit", async (e) =>
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 100);
-  camera.position.set(0, 0, 9);
+  camera.position.set(0, 0, 13);
+  const CAMERA_REST_Z = 9;
 
   // wireframe core
   const coreGeo = new THREE.IcosahedronGeometry(2.4, 1);
@@ -488,6 +542,29 @@ document.getElementById("waitlist-form").addEventListener("submit", async (e) =>
   const particles = new THREE.Points(particleGeo, particleMat);
   scene.add(particles);
 
+  // glowing emblem (the "chip with logo" beat from the reference, in TFN's own mark)
+  function makeEmblemTexture() {
+    const c = document.createElement("canvas");
+    c.width = 512; c.height = 512;
+    const ctx = c.getContext("2d");
+    const grad = ctx.createRadialGradient(256, 256, 10, 256, 256, 240);
+    grad.addColorStop(0, "rgba(247,199,102,.85)");
+    grad.addColorStop(0.35, "rgba(240,178,62,.28)");
+    grad.addColorStop(1, "rgba(240,178,62,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 512, 512);
+    ctx.font = "900 148px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#fff6e6";
+    ctx.fillText("TFN", 256, 268);
+    return new THREE.CanvasTexture(c);
+  }
+  const emblemMat = new THREE.SpriteMaterial({ map: makeEmblemTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.9 });
+  const emblem = new THREE.Sprite(emblemMat);
+  emblem.scale.set(3, 3, 1);
+  scene.add(emblem);
+
   let mouseX = 0, mouseY = 0;
   hero.addEventListener("pointermove", (e) => {
     const rect = hero.getBoundingClientRect();
@@ -511,8 +588,12 @@ document.getElementById("waitlist-form").addEventListener("submit", async (e) =>
     inner.rotation.y -= 0.0022;
     inner.rotation.x += 0.0012;
     particles.rotation.y += 0.0004;
+    const t = performance.now() * 0.001;
+    emblem.scale.setScalar(3 + Math.sin(t * 1.4) * 0.12);
+    emblemMat.opacity = 0.78 + Math.sin(t * 1.4) * 0.12;
     camera.position.x += (mouseX * 1.2 - camera.position.x) * 0.03;
     camera.position.y += (-mouseY * 0.8 - camera.position.y) * 0.03;
+    camera.position.z += (CAMERA_REST_Z - camera.position.z) * 0.02;
     camera.lookAt(0, 0, 0);
     renderer.render(scene, camera);
   }
