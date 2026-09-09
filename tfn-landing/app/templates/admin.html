@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Admin — THE FORGE NETWORK{% endblock %}
+{% block content %}
+<h1>Admin</h1>
+<p class="muted">Signed in as {{ user.email }}</p>
+
+<div class="stat-row" style="margin-top:24px;">
+  <div class="card stat"><div class="n">{{ user_count }}</div><div class="l">Registered users</div></div>
+  <div class="card stat"><div class="n">{{ waitlist_count }}</div><div class="l">Waitlist signups</div></div>
+</div>
+
+<div class="card">
+  <h3>Recent users</h3>
+  <div style="overflow-x:auto;">
+  <table class="simple">
+    <thead><tr><th>Email</th><th>Joined</th><th>Admin</th></tr></thead>
+    <tbody>
+    {% for u in users %}
+      <tr><td>{{ u.email }}</td><td>{{ u.created_at.strftime("%Y-%m-%d") }}</td><td>{{ "Yes" if u.is_admin else "" }}</td></tr>
+    {% else %}
+      <tr><td colspan="3" class="muted">No users yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h3>Recent waitlist signups</h3>
+  <div style="overflow-x:auto;">
+  <table class="simple">
+    <thead><tr><th>Email</th><th>Building</th><th>Joined</th></tr></thead>
+    <tbody>
+    {% for w in waitlist %}
+      <tr><td>{{ w.email }}</td><td>{{ w.building }}</td><td>{{ w.created_at.strftime("%Y-%m-%d") }}</td></tr>
+    {% else %}
+      <tr><td colspan="3" class="muted">No signups yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

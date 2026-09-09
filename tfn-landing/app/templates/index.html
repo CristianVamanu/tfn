@@ -255,8 +255,13 @@
       <a href="#pricing">Pricing</a>
     </div>
     <div class="navauth">
-      <a href="#waitlist" class="btn-ghost btn btn-sm">Log in</a>
-      <a href="#waitlist" class="btn btn-primary btn-sm">Start Building</a>
+      {% if user %}
+        <a href="/dashboard" class="btn-ghost btn btn-sm">Dashboard</a>
+        {% if user.is_admin %}<a href="/admin" class="btn-ghost btn btn-sm">Admin</a>{% endif %}
+      {% else %}
+        <a href="/login" class="btn-ghost btn btn-sm">Log in</a>
+        <a href="/signup" class="btn btn-primary btn-sm">Start Building</a>
+      {% endif %}
     </div>
   </div>
 </nav>
@@ -268,7 +273,7 @@
     <h1>Build something<br>that <span class="accent">pays you.</span></h1>
     <p class="lede">Stop collecting information. Start building. TFN gives you the roadmap, tools, AI guidance and network to turn an idea into something that generates income.</p>
     <div class="hero-ctas">
-      <a href="#waitlist" class="btn btn-primary">Start Building</a>
+      <a href="/signup" class="btn btn-primary">Start Building</a>
       <a href="#forge" class="btn btn-ghost">See How It Works</a>
     </div>
   </div>
@@ -448,7 +453,7 @@
         <div class="foot-col" id="pricing">
           <h5>Company</h5>
           <a href="#waitlist">Pricing</a>
-          <a href="#waitlist">Log in</a>
+          <a href="/login">Log in</a>
         </div>
       </div>
     </div>

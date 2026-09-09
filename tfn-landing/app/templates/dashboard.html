@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — THE FORGE NETWORK{% endblock %}
+{% block content %}
+<h1>Welcome back</h1>
+<p class="muted">{{ user.email }} · member since {{ user.created_at.strftime("%b %Y") }}</p>
+
+<div class="card" style="margin-top:28px;">
+  <h3>Your Forge</h3>
+  {% if forge %}
+    <p class="muted">Goal <b style="color:var(--text)">{{ forge.goal }}</b></p>
+    <p class="muted">Business model <b style="color:var(--text)">{{ forge.business_model }}</b></p>
+    <p class="muted">Time available <b style="color:var(--text)">{{ forge.time_available }}</b></p>
+    <p class="muted" style="margin-top:18px; padding-top:16px; border-top:1px solid var(--border-soft);">
+      Personalised AI roadmap generation is still in development. Your answers are saved so nothing's lost once it ships.
+    </p>
+  {% else %}
+    <p class="muted">Tell TFN what you're building to start your Forge.</p>
+    <form id="forge-form" style="margin-top:18px;">
+      <div class="form-field"><label>Your goal</label><input id="goal" placeholder="e.g. £5,000/mo" required></div>
+      <div class="form-field"><label>Business model</label><input id="business_model" placeholder="e.g. AI Agency" required></div>
+      <div class="form-field"><label>Time available</label><input id="time_available" placeholder="e.g. 10 hrs/wk" required></div>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+    <div class="form-msg" id="forge-msg"></div>
+  {% endif %}
+</div>
+
+<script>
+const forgeForm = document.getElementById("forge-form");
+if (forgeForm) {
+  forgeForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = {
+      goal: document.getElementById("goal").value.trim(),
+      business_model: document.getElementById("business_model").value.trim(),
+      time_available: document.getElementById("time_available").value.trim(),
+    };
+    const msg = document.getElementById("forge-msg");
+    msg.className = "form-msg";
+    msg.textContent = "Saving...";
+    try {
+      const res = await fetch("/api/forge", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) throw new Error();
+      window.location.reload();
+    } catch (err) {
+      msg.className = "form-msg err";
+      msg.textContent = "Something went wrong - try again.";
+    }
+  });
+}
+</script>
+{% endblock %}
