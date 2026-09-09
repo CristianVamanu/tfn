@@ -11,7 +11,8 @@ from sqlalchemy import func, select
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth import hash_password, verify_password
-from app.db import ForgeProfile, User, WaitlistSignup, get_session, init_db
+from app.db import ForgeProfile, ForgeStep, User, WaitlistSignup, get_session, init_db
+from app.roadmap_templates import get_template
 
 app = FastAPI(title="THE FORGE NETWORK")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -148,10 +149,13 @@ def dashboard(request: Request):
     with get_session() as session:
         forge = session.query(ForgeProfile).filter_by(user_id=user["id"]).first()
         forge_data = None
+        steps_data = []
         if forge:
             forge_data = {"goal": forge.goal, "business_model": forge.business_model, "time_available": forge.time_available}
+            steps = session.query(ForgeStep).filter_by(user_id=user["id"]).order_by(ForgeStep.step_index).all()
+            steps_data = [{"id": s.id, "title": s.title, "description": s.description, "status": s.status} for s in steps]
 
-    return templates.TemplateResponse(request, "dashboard.html", {"user": user, "forge": forge_data})
+    return templates.TemplateResponse(request, "dashboard.html", {"user": user, "forge": forge_data, "steps": steps_data})
 
 
 class ForgeBody(BaseModel):
@@ -171,12 +175,83 @@ def api_forge(body: ForgeBody, request: Request):
         if existing:
             return JSONResponse({"error": "your Forge is already set up"}, status_code=400)
 
+        business_model = body.business_model.strip()[:120]
         session.add(ForgeProfile(
             user_id=user["id"],
             goal=body.goal.strip()[:120],
-            business_model=body.business_model.strip()[:120],
+            business_model=business_model,
             time_available=body.time_available.strip()[:60],
         ))
+
+        for i, (title, description) in enumerate(get_template(business_model)):
+            session.add(ForgeStep(
+                user_id=user["id"],
+                step_index=i,
+                title=title,
+                description=description,
+                status="current" if i == 0 else "todo",
+            ))
+
+        session.commit()
+
+    return {"ok": True}
+
+
+@app.post("/api/forge/steps/{step_id}/complete")
+def api_forge_step_complete(step_id: int, request: Request):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+
+    with get_session() as session:
+        step = session.get(ForgeStep, step_id)
+        if not step or step.user_id != user["id"]:
+            return JSONResponse({"error": "step not found"}, status_code=404)
+        if step.status == "done":
+            return JSONResponse({"error": "already complete"}, status_code=400)
+
+        step.status = "done"
+        next_step = (
+            session.query(ForgeStep)
+            .filter_by(user_id=user["id"], status="todo")
+            .order_by(ForgeStep.step_index)
+            .first()
+        )
+        if next_step:
+            next_step.status = "current"
+        session.commit()
+
+    return {"ok": True}
+
+
+# ---------- account ----------
+
+@app.get("/account", response_class=HTMLResponse)
+def account_page(request: Request):
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    return templates.TemplateResponse(request, "account.html", {"user": user})
+
+
+class PasswordChangeBody(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@app.post("/api/account/password")
+def api_account_password(body: PasswordChangeBody, request: Request):
+    user = get_current_user(request)
+    if not user:
+        return JSONResponse({"error": "not logged in"}, status_code=401)
+    if len(body.new_password) < 8:
+        return JSONResponse({"error": "new password must be at least 8 characters"}, status_code=400)
+
+    with get_session() as session:
+        db_user = session.get(User, user["id"])
+        if not verify_password(body.current_password, db_user.password_hash):
+            return JSONResponse({"error": "current password is incorrect"}, status_code=401)
+        db_user.password_hash = hash_password(body.new_password)
         session.commit()
 
     return {"ok": True}

@@ -41,6 +41,18 @@ class ForgeProfile(Base):
     time_available: Mapped[str] = mapped_column(String(60), default="")
 
 
+class ForgeStep(Base):
+    __tablename__ = "forge_steps"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer)
+    step_index: Mapped[int] = mapped_column(Integer)
+    title: Mapped[str] = mapped_column(String(120))
+    description: Mapped[str] = mapped_column(String(300), default="")
+    status: Mapped[str] = mapped_column(String(20), default="todo")  # todo | current | done
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
+
+
 os.makedirs("data", exist_ok=True)
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 engine = create_engine(DATABASE_URL, connect_args=connect_args)

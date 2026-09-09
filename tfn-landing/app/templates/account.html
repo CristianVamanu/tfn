@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Account — THE FORGE NETWORK{% endblock %}
+{% block content %}
+<h1>Account</h1>
+<p class="muted">{{ user.email }} · member since {{ user.created_at.strftime("%b %Y") }}</p>
+
+<div class="card auth-card" style="margin-top:24px;">
+  <h3>Change password</h3>
+  <form id="password-form" style="margin-top:16px;">
+    <div class="form-field"><label>Current password</label><input type="password" id="current_password" required autocomplete="current-password"></div>
+    <div class="form-field"><label>New password</label><input type="password" id="new_password" required minlength="8" autocomplete="new-password"></div>
+    <button type="submit" class="btn btn-primary">Update password</button>
+  </form>
+  <div class="form-msg" id="msg"></div>
+</div>
+
+<script>
+document.getElementById("password-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const current_password = document.getElementById("current_password").value;
+  const new_password = document.getElementById("new_password").value;
+  const msg = document.getElementById("msg");
+  msg.className = "form-msg";
+  msg.textContent = "Updating...";
+  try {
+    const res = await fetch("/api/account/password", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ current_password, new_password })
+    });
+    const data = await res.json();
+    if (data.error) {
+      msg.className = "form-msg err";
+      msg.textContent = data.error;
+      return;
+    }
+    msg.className = "form-msg ok";
+    msg.textContent = "Password updated.";
+    document.getElementById("password-form").reset();
+  } catch (err) {
+    msg.className = "form-msg err";
+    msg.textContent = "Something went wrong - try again.";
+  }
+});
+</script>
+{% endblock %}

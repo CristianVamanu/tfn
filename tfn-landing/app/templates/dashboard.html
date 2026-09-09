@@ -1,5 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — THE FORGE NETWORK{% endblock %}
+{% block extra_style %}
+  .step-list { list-style: none; margin: 0; padding: 0; }
+  .step-row { display: flex; align-items: flex-start; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--border-soft); }
+  .step-row:last-child { border-bottom: none; }
+  .step-check { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--border); flex: none; margin-top: 2px; display: flex; align-items: center; justify-content: center; }
+  .step-row.done .step-check { background: var(--green); border-color: var(--green); }
+  .step-row.done .step-check::after { content: "✓"; color: #05130a; font-size: 12px; font-weight: 900; }
+  .step-row.current .step-check { border-color: var(--gold); }
+  .step-title { font-weight: 700; font-size: 14.5px; }
+  .step-row.done .step-title { color: var(--text-dim); text-decoration: line-through; text-decoration-color: var(--border); }
+  .step-desc { font-size: 13px; color: var(--text-dim); margin-top: 3px; line-height: 1.5; }
+  .step-complete-btn { margin-top: 10px; }
+{% endblock %}
 {% block content %}
 <h1>Welcome back</h1>
 <p class="muted">{{ user.email }} · member since {{ user.created_at.strftime("%b %Y") }}</p>
@@ -7,17 +20,45 @@
 <div class="card" style="margin-top:28px;">
   <h3>Your Forge</h3>
   {% if forge %}
-    <p class="muted">Goal <b style="color:var(--text)">{{ forge.goal }}</b></p>
-    <p class="muted">Business model <b style="color:var(--text)">{{ forge.business_model }}</b></p>
-    <p class="muted">Time available <b style="color:var(--text)">{{ forge.time_available }}</b></p>
+    <p class="muted">Goal <b style="color:var(--text)">{{ forge.goal }}</b> · {{ forge.business_model }} · {{ forge.time_available }}</p>
+    <ul class="step-list" style="margin-top:20px;">
+      {% for step in steps %}
+        <li class="step-row {{ step.status }}">
+          <span class="step-check"></span>
+          <div style="flex:1;">
+            <div class="step-title">{{ step.title }}</div>
+            <div class="step-desc">{{ step.description }}</div>
+            {% if step.status == "current" %}
+              <button class="btn btn-primary btn-sm step-complete-btn" data-step-id="{{ step.id }}" onclick="completeStep({{ step.id }})">Mark complete</button>
+            {% endif %}
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+    <div class="form-msg" id="step-msg"></div>
     <p class="muted" style="margin-top:18px; padding-top:16px; border-top:1px solid var(--border-soft);">
-      Personalised AI roadmap generation is still in development. Your answers are saved so nothing's lost once it ships.
+      This roadmap is curated, not yet AI-personalised. Real AI-generated roadmaps are planned - see the project roadmap.
     </p>
   {% else %}
     <p class="muted">Tell TFN what you're building to start your Forge.</p>
     <form id="forge-form" style="margin-top:18px;">
       <div class="form-field"><label>Your goal</label><input id="goal" placeholder="e.g. £5,000/mo" required></div>
-      <div class="form-field"><label>Business model</label><input id="business_model" placeholder="e.g. AI Agency" required></div>
+      <div class="form-field">
+        <label>Business model</label>
+        <select id="business_model" required>
+          <option value="">Choose one</option>
+          <option>AI Business</option>
+          <option>Personal Brand</option>
+          <option>YouTube</option>
+          <option>E-Commerce</option>
+          <option>Affiliate Business</option>
+          <option>Digital Products</option>
+          <option>Freelancing / Services</option>
+          <option>Software / SaaS</option>
+          <option>Trading</option>
+          <option>Other</option>
+        </select>
+      </div>
       <div class="form-field"><label>Time available</label><input id="time_available" placeholder="e.g. 10 hrs/wk" required></div>
       <button type="submit" class="btn btn-primary">Save</button>
     </form>
@@ -26,13 +67,27 @@
 </div>
 
 <script>
+async function completeStep(stepId) {
+  const msg = document.getElementById("step-msg");
+  msg.className = "form-msg";
+  msg.textContent = "Saving...";
+  try {
+    const res = await fetch(`/api/forge/steps/${stepId}/complete`, { method: "POST" });
+    if (!res.ok) throw new Error();
+    window.location.reload();
+  } catch (err) {
+    msg.className = "form-msg err";
+    msg.textContent = "Something went wrong - try again.";
+  }
+}
+
 const forgeForm = document.getElementById("forge-form");
 if (forgeForm) {
   forgeForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const body = {
       goal: document.getElementById("goal").value.trim(),
-      business_model: document.getElementById("business_model").value.trim(),
+      business_model: document.getElementById("business_model").value,
       time_available: document.getElementById("time_available").value.trim(),
     };
     const msg = document.getElementById("forge-msg");
